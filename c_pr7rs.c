@@ -66,8 +66,7 @@ char *read_file(char *path) {
         fp = stdin;
     } else {
         fp = fopen(path, "r");
-        if (!fp)
-            return NULL;
+        if (!fp) return NULL;
     }
 
     char *buf;
@@ -77,13 +76,11 @@ char *read_file(char *path) {
     for (;;) {
         char buf2[2048];
         int n = fread(buf2, 1, sizeof(buf2), fp);
-        if (n == 0)
-            break;
+        if (n == 0) break;
         fwrite(buf2, 1, n, out);
     }
 
-    if (fp != stdin)
-        fclose(fp);
+    if (fp != stdin) fclose(fp);
 
     fflush(out);
     fputc('\0', out);
@@ -98,8 +95,7 @@ Token *tokenize(char *c) {
     while (*c != '\0') {
         // skip comment
         if (in_comment) {
-            if (*c == '\n')
-                in_comment = false;
+            if (*c == '\n') in_comment = false;
             c++;
             continue;
         }
@@ -131,13 +127,11 @@ Token *tokenize(char *c) {
         } else if (isdigit(*c)) {
             // TODO: support +10, -2
             char *start = c;
-            while (isdigit(*c))
-                c++;
+            while (isdigit(*c)) c++;
             tok->next = token(TOK_NUM, start, c - start);
         } else if (isalpha(*c) || strchr(ident_chars, *c)) {
             char *start = c;
-            while (*c != '\0' && (isalnum(*c) || strchr(ident_chars, *c)))
-                c++;
+            while (*c != '\0' && (isalnum(*c) || strchr(ident_chars, *c))) c++;
             tok->next = token(TOK_IDENT, start, c - start);
         } else {
             c++;
@@ -152,54 +146,50 @@ Token *tokenize(char *c) {
 Obj *parse(Token **tok) {
     TokenType type = (*tok)->type;
     switch (type) {
-    case TOK_LPAREN: {
-        Obj *cur_obj = obj(OBJ_PAIR);
-        Obj *head = cur_obj;
-        *tok = (*tok)->next;
-        while ((*tok)->type != TOK_RPAREN) {
-            cur_obj->value.pair.car = parse(tok);
-            cur_obj->value.pair.cdr = obj(OBJ_PAIR);
+        case TOK_LPAREN: {
+            Obj *cur_obj = obj(OBJ_PAIR);
+            Obj *head = cur_obj;
             *tok = (*tok)->next;
-            cur_obj = cur_obj->value.pair.cdr;
+            while ((*tok)->type != TOK_RPAREN) {
+                cur_obj->value.pair.car = parse(tok);
+                cur_obj->value.pair.cdr = obj(OBJ_PAIR);
+                *tok = (*tok)->next;
+                cur_obj = cur_obj->value.pair.cdr;
+            }
+            cur_obj->type = OBJ_NIL;
+            return head;
         }
-        cur_obj->type = OBJ_NIL;
-        return head;
-    }
-    case TOK_RPAREN:
-        return NULL;
-    case TOK_NUM: {
-        Obj *o = obj(OBJ_NUM);
-        o->value.number = strtol((*tok)->str, NULL, 10);
-        return o;
-    }
-    case TOK_IDENT: {
-        Obj *o = obj(OBJ_SYM);
-        o->value.symbol = (*tok)->str;
-        o->len = (*tok)->len;
-        return o;
-    }
-    case TOK_TRUE: {
-        Obj *o = obj(OBJ_BOOL);
-        o->value.boolean = true;
-        return o;
-    }
-    case TOK_FALSE: {
-        Obj *o = obj(OBJ_BOOL);
-        o->value.boolean = false;
-        return o;
-    }
-    case TOK_QUOTE:
-        return parse(&(*tok)->next); // TODO: fix
+        case TOK_RPAREN:
+            return NULL;
+        case TOK_NUM: {
+            Obj *o = obj(OBJ_NUM);
+            o->value.number = strtol((*tok)->str, NULL, 10);
+            return o;
+        }
+        case TOK_IDENT: {
+            Obj *o = obj(OBJ_SYM);
+            o->value.symbol = (*tok)->str;
+            o->len = (*tok)->len;
+            return o;
+        }
+        case TOK_TRUE: {
+            Obj *o = obj(OBJ_BOOL);
+            o->value.boolean = true;
+            return o;
+        }
+        case TOK_FALSE: {
+            Obj *o = obj(OBJ_BOOL);
+            o->value.boolean = false;
+            return o;
+        }
+        case TOK_QUOTE:
+            return parse(&(*tok)->next);  // TODO: fix
     }
 }
 
-Obj *car(Obj *cons) {
-    return cons->value.pair.car;
-}
+Obj *car(Obj *cons) { return cons->value.pair.car; }
 
-Obj *cdr(Obj *cons) {
-    return cons->value.pair.cdr;
-}
+Obj *cdr(Obj *cons) { return cons->value.pair.cdr; }
 
 Obj *eval(Obj *obj);
 
@@ -233,15 +223,19 @@ Obj *f_mult(Obj *args) {
 }
 
 Obj *f_if(Obj *args) {
-    return eval(car(args))->value.boolean ? eval(car(cdr(args))) : eval(car(cdr(cdr(args))));
+    return eval(car(args))->value.boolean ? eval(car(cdr(args)))
+                                          : eval(car(cdr(cdr(args))));
 }
 
 Obj *apply(Obj *fn, Obj *args) {
     if (fn->type == OBJ_SYM) {
         if (fn->len == 1) {
-            if (strncmp(fn->value.symbol, "+", 1) == 0) return f_add(args);
-            else if (strncmp(fn->value.symbol, "-", 1) == 0) return f_sub(args);
-            else if (strncmp(fn->value.symbol, "*", 1) == 0) return f_mult(args);
+            if (strncmp(fn->value.symbol, "+", 1) == 0)
+                return f_add(args);
+            else if (strncmp(fn->value.symbol, "-", 1) == 0)
+                return f_sub(args);
+            else if (strncmp(fn->value.symbol, "*", 1) == 0)
+                return f_mult(args);
         } else if (fn->len == 2) {
             if (strncmp(fn->value.symbol, "if", 2) == 0) return f_if(args);
         }
@@ -281,29 +275,29 @@ void print_tokens(Token *tok_head) {
 
 void print_obj_2(Obj *obj) {
     switch (obj->type) {
-    case OBJ_NUM:
-        printf("%d", obj->value.number);
-        break;
-    case OBJ_BOOL:
-        printf("%s", obj->value.boolean ? "#t" : "#f");
-        break;
-    case OBJ_SYM: {
-        char sym_str[TOKEN_MAX_LEN];
-        strncpy(sym_str, obj->value.symbol, obj->len);
-        sym_str[obj->len] = '\0';
-        printf("%s", sym_str);
-        break;
-    }
-    case OBJ_PAIR:
-        printf("( ");
-        print_obj_2(obj->value.pair.car);
-        printf(" . ");
-        print_obj_2(obj->value.pair.cdr);
-        printf(" )");
-        break;
-    case OBJ_NIL:
-        printf("nil");
-        break;
+        case OBJ_NUM:
+            printf("%d", obj->value.number);
+            break;
+        case OBJ_BOOL:
+            printf("%s", obj->value.boolean ? "#t" : "#f");
+            break;
+        case OBJ_SYM: {
+            char sym_str[TOKEN_MAX_LEN];
+            strncpy(sym_str, obj->value.symbol, obj->len);
+            sym_str[obj->len] = '\0';
+            printf("%s", sym_str);
+            break;
+        }
+        case OBJ_PAIR:
+            printf("( ");
+            print_obj_2(obj->value.pair.car);
+            printf(" . ");
+            print_obj_2(obj->value.pair.cdr);
+            printf(" )");
+            break;
+        case OBJ_NIL:
+            printf("nil");
+            break;
     }
 }
 
