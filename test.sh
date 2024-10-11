@@ -17,7 +17,8 @@ assert '(- 1 2)' -1
 assert '(- 3 2 1)' 0
 assert '(* 1 2)' 2
 assert '(* 3 2 1)' 6
-# assert "'foo" "'foo"
-# assert '((if #t '+ '*) 3 5)' 8
+assert '(if #t 0 1)' 0
+assert '(if #f 0 1)' 1
+assert "((if #t '+ '*) 3 5)" 8
 
 echo 'ALL TESTS PASSED'

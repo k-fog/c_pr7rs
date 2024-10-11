@@ -122,8 +122,7 @@ Token *tokenize(char *c) {
         } else if (*c == '#') {
             TokenType type = TOK_FALSE;
             c++;
-            if (*c == 't')
-                type = TOK_TRUE;
+            if (*c == 't') type = TOK_TRUE;
             tok->next = token(type, c - 1, 2);
             c++;
         } else if (*c == '\'') {
@@ -233,11 +232,19 @@ Obj *f_mult(Obj *args) {
     return number(n);
 }
 
+Obj *f_if(Obj *args) {
+    return eval(car(args))->value.boolean ? eval(car(cdr(args))) : eval(car(cdr(cdr(args))));
+}
+
 Obj *apply(Obj *fn, Obj *args) {
-    if (fn->type == OBJ_SYM && fn->len == 1) {
-        if (strncmp(fn->value.symbol, "+", 1) == 0) return f_add(args);
-        else if (strncmp(fn->value.symbol, "-", 1) == 0) return f_sub(args);
-        else if (strncmp(fn->value.symbol, "*", 1) == 0) return f_mult(args);
+    if (fn->type == OBJ_SYM) {
+        if (fn->len == 1) {
+            if (strncmp(fn->value.symbol, "+", 1) == 0) return f_add(args);
+            else if (strncmp(fn->value.symbol, "-", 1) == 0) return f_sub(args);
+            else if (strncmp(fn->value.symbol, "*", 1) == 0) return f_mult(args);
+        } else if (fn->len == 2) {
+            if (strncmp(fn->value.symbol, "if", 2) == 0) return f_if(args);
+        }
     }
     printf("error\n");
     return NULL;
