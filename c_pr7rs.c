@@ -29,6 +29,12 @@ Obj *obj(ObjType type) {
     return obj;
 }
 
+Obj *number(int n) {
+    Obj *o = obj(OBJ_NUM);
+    o->value.number = n;
+    return o;
+}
+
 typedef enum {
     TOK_LPAREN,
     TOK_RPAREN,
@@ -188,21 +194,70 @@ Obj *parse(Token **tok) {
     }
 }
 
-// Obj *eval(Obj *obj) {
-//     // TODO: env
-//     switch (obj->type) {
-//         case OBJ_NUM:
-//         case OBJ_BOOL:
-//             return obj;
-//         case OBJ_SYM: {
-//             char str[TOKEN_MAX_LEN];
-//             strncpy(str, obj->value.symbol, obj->len);
-//             obj->value.symbol = str;
-//             return obj;
-//         }
-//         case OBJ_PAIR, OBJ_NIL } ObjType;
-//     }
-// }
+Obj *car(Obj *cons) {
+    return cons->value.pair.car;
+}
+
+Obj *cdr(Obj *cons) {
+    return cons->value.pair.cdr;
+}
+
+Obj *eval(Obj *obj);
+
+Obj *f_add(Obj *args) {
+    int n = 0;
+    while (args->type == OBJ_PAIR) {
+        n += eval(car(args))->value.number;
+        args = cdr(args);
+    }
+    return number(n);
+}
+
+Obj *f_sub(Obj *args) {
+    int n = eval(car(args))->value.number;
+    args = cdr(args);
+    while (args->type == OBJ_PAIR) {
+        n -= eval(car(args))->value.number;
+        args = cdr(args);
+    }
+    return number(n);
+}
+
+Obj *f_mult(Obj *args) {
+    int n = eval(car(args))->value.number;
+    args = cdr(args);
+    while (args->type == OBJ_PAIR) {
+        n *= eval(car(args))->value.number;
+        args = cdr(args);
+    }
+    return number(n);
+}
+
+Obj *apply(Obj *fn, Obj *args) {
+    if (fn->type == OBJ_SYM && fn->len == 1) {
+        if (strncmp(fn->value.symbol, "+", 1) == 0) return f_add(args);
+        else if (strncmp(fn->value.symbol, "-", 1) == 0) return f_sub(args);
+        else if (strncmp(fn->value.symbol, "*", 1) == 0) return f_mult(args);
+    }
+    printf("error\n");
+    return NULL;
+}
+
+Obj *eval(Obj *obj) {
+    // TODO: env
+    switch (obj->type) {
+        case OBJ_NUM:
+        case OBJ_BOOL:
+        case OBJ_NIL:
+        case OBJ_SYM:
+            return obj;
+        case OBJ_PAIR: {
+            Obj *fn = eval(car(obj));
+            Obj *args = cdr(obj);
+            return apply(fn, args);
+        }
+    }
+}
 
 void print_tokens(Token *tok_head) {
     printf("[DEBUG] tokens:\n");
@@ -246,7 +301,6 @@ void print_obj_2(Obj *obj) {
 }
 
 void print_obj(Obj *obj) {
-    printf("[DEBUG] parse result:\n");
     print_obj_2(obj);
     printf("\n");
 }
@@ -255,8 +309,10 @@ int main(int argc, char *argv[]) {
     // char *lines = read_file("");
     char *input = argv[1];
     Token *tok = tokenize(input);
-    print_tokens(tok);
-    Obj *o = parse(&tok);
-    print_obj(o);
+    // print_tokens(tok);
+    Obj *ast = parse(&tok);
+    // print_obj(ast);
+    Obj *result = eval(ast);
+    print_obj(result);
     return 0;
 }

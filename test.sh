@@ -1,15 +1,23 @@
 #!/bin/sh
 
 assert () {
-    ./pr7rs $1
-    OUTPUT=$?
+    OUTPUT=`./pr7rs "$1"`
     if [ $OUTPUT = $2 ]; then
-        echo "$1 ==> $OUTPUT"
+        echo $1 '==>' $OUTPUT
     else
-        echo "ERROR"
+        echo $2 expected, but got $OUTPUT
+        echo 'FAILED'
+        exit
     fi
 }
 
-assert "'foo" "'foo"
 assert '(+ 1 2)' 3
-assert '((if #t '+ '*) 3 5)' 8
+assert '(+ 3 2 1)' 6
+assert '(- 1 2)' -1
+assert '(- 3 2 1)' 0
+assert '(* 1 2)' 2
+assert '(* 3 2 1)' 6
+# assert "'foo" "'foo"
+# assert '((if #t '+ '*) 3 5)' 8
+
+echo 'ALL TESTS PASSED'
