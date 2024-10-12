@@ -204,45 +204,44 @@ Obj *car(Obj *cons) { return cons->value.pair.car; }
 
 Obj *cdr(Obj *cons) { return cons->value.pair.cdr; }
 
-Obj *eval(Obj *obj, bool is_quoted);
+Obj *eval(Obj *obj);
+Obj *eval_2(Obj *obj, bool is_quoted);
 
 Obj *f_add(Obj *args) {
     int n = 0;
     while (args->type == OBJ_PAIR) {
-        n += eval(car(args), false)->value.number;
+        n += eval(car(args))->value.number;
         args = cdr(args);
     }
     return number(n);
 }
 
 Obj *f_sub(Obj *args) {
-    int n = eval(car(args), false)->value.number;
+    int n = eval(car(args))->value.number;
     args = cdr(args);
     while (args->type == OBJ_PAIR) {
-        n -= eval(car(args), false)->value.number;
+        n -= eval(car(args))->value.number;
         args = cdr(args);
     }
     return number(n);
 }
 
 Obj *f_mult(Obj *args) {
-    int n = eval(car(args), false)->value.number;
+    int n = eval(car(args))->value.number;
     args = cdr(args);
     while (args->type == OBJ_PAIR) {
-        n *= eval(car(args), false)->value.number;
+        n *= eval(car(args))->value.number;
         args = cdr(args);
     }
     return number(n);
 }
 
 Obj *f_if(Obj *args) {
-    return eval(car(args), false)->value.boolean ? eval(car(cdr(args)), false)
-                                          : eval(car(cdr(cdr(args))), false);
+    return eval(car(args))->value.boolean ? eval(car(cdr(args)))
+                                          : eval(car(cdr(cdr(args))));
 }
 
-Obj *f_quote(Obj *args) {
-    return eval(car(args), true);
-}
+Obj *f_quote(Obj *args) { return eval_2(car(args), true); }
 
 Obj *apply(Obj *fn, Obj *args) {
     if (fn->type == OBJ_SYM) {
@@ -256,14 +255,17 @@ Obj *apply(Obj *fn, Obj *args) {
         } else if (fn->len == 2) {
             if (strncmp(fn->value.symbol, "if", 2) == 0) return f_if(args);
         } else if (fn->len == 5) {
-            if (strncmp(fn->value.symbol, "quote", 5) == 0) return f_quote(args);
+            if (strncmp(fn->value.symbol, "quote", 5) == 0)
+                return f_quote(args);
         }
     }
     printf("error\n");
     return NULL;
 }
 
-Obj *eval(Obj *obj, bool is_quoted) {
+Obj *eval(Obj *obj) { return eval_2(obj, false); }
+
+Obj *eval_2(Obj *obj, bool is_quoted) {
     // TODO: env
     if (is_quoted) return obj;
     switch (obj->type) {
@@ -273,7 +275,7 @@ Obj *eval(Obj *obj, bool is_quoted) {
         case OBJ_SYM:
             return obj;
         case OBJ_PAIR: {
-            Obj *fn = eval(car(obj), false);
+            Obj *fn = eval(car(obj));
             Obj *args = cdr(obj);
             return apply(fn, args);
         }
@@ -343,7 +345,7 @@ int main(int argc, char *argv[]) {
     // print_tokens(tok);
     Obj *ast = parse(&tok);
     // print_obj(ast);
-    Obj *result = eval(ast, false);
+    Obj *result = eval(ast);
     print_obj(result);
     return 0;
 }
