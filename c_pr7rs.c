@@ -35,6 +35,13 @@ Obj *number(int n) {
     return o;
 }
 
+Obj *symbol(char *sym) {
+    Obj *o = obj(OBJ_SYM);
+    o->value.symbol = sym;
+    o->len = strlen(sym);
+    return o;
+}
+
 typedef enum {
     TOK_LPAREN,
     TOK_RPAREN,
@@ -182,8 +189,14 @@ Obj *parse(Token **tok) {
             o->value.boolean = false;
             return o;
         }
-        case TOK_QUOTE:
-            return parse(&(*tok)->next);  // TODO: fix
+        case TOK_QUOTE: {
+            Obj *o = obj(OBJ_PAIR);
+            o->value.pair.car = symbol("quote");
+            o->value.pair.cdr = obj(OBJ_PAIR);
+            o->value.pair.cdr->value.pair.car = parse(&(*tok)->next);
+            o->value.pair.cdr->value.pair.cdr = obj(OBJ_NIL);
+            return o;
+        }
     }
 }
 
@@ -191,40 +204,44 @@ Obj *car(Obj *cons) { return cons->value.pair.car; }
 
 Obj *cdr(Obj *cons) { return cons->value.pair.cdr; }
 
-Obj *eval(Obj *obj);
+Obj *eval(Obj *obj, bool is_quoted);
 
 Obj *f_add(Obj *args) {
     int n = 0;
     while (args->type == OBJ_PAIR) {
-        n += eval(car(args))->value.number;
+        n += eval(car(args), false)->value.number;
         args = cdr(args);
     }
     return number(n);
 }
 
 Obj *f_sub(Obj *args) {
-    int n = eval(car(args))->value.number;
+    int n = eval(car(args), false)->value.number;
     args = cdr(args);
     while (args->type == OBJ_PAIR) {
-        n -= eval(car(args))->value.number;
+        n -= eval(car(args), false)->value.number;
         args = cdr(args);
     }
     return number(n);
 }
 
 Obj *f_mult(Obj *args) {
-    int n = eval(car(args))->value.number;
+    int n = eval(car(args), false)->value.number;
     args = cdr(args);
     while (args->type == OBJ_PAIR) {
-        n *= eval(car(args))->value.number;
+        n *= eval(car(args), false)->value.number;
         args = cdr(args);
     }
     return number(n);
 }
 
 Obj *f_if(Obj *args) {
-    return eval(car(args))->value.boolean ? eval(car(cdr(args)))
-                                          : eval(car(cdr(cdr(args))));
+    return eval(car(args), false)->value.boolean ? eval(car(cdr(args)), false)
+                                          : eval(car(cdr(cdr(args))), false);
+}
+
+Obj *f_quote(Obj *args) {
+    return eval(car(args), true);
 }
 
 Obj *apply(Obj *fn, Obj *args) {
@@ -238,14 +255,17 @@ Obj *apply(Obj *fn, Obj *args) {
                 return f_mult(args);
         } else if (fn->len == 2) {
             if (strncmp(fn->value.symbol, "if", 2) == 0) return f_if(args);
+        } else if (fn->len == 5) {
+            if (strncmp(fn->value.symbol, "quote", 5) == 0) return f_quote(args);
         }
     }
     printf("error\n");
     return NULL;
 }
 
-Obj *eval(Obj *obj) {
+Obj *eval(Obj *obj, bool is_quoted) {
     // TODO: env
+    if (is_quoted) return obj;
     switch (obj->type) {
         case OBJ_NUM:
         case OBJ_BOOL:
@@ -253,7 +273,7 @@ Obj *eval(Obj *obj) {
         case OBJ_SYM:
             return obj;
         case OBJ_PAIR: {
-            Obj *fn = eval(car(obj));
+            Obj *fn = eval(car(obj), false);
             Obj *args = cdr(obj);
             return apply(fn, args);
         }
@@ -288,15 +308,25 @@ void print_obj_2(Obj *obj) {
             printf("%s", sym_str);
             break;
         }
-        case OBJ_PAIR:
-            printf("( ");
-            print_obj_2(obj->value.pair.car);
-            printf(" . ");
-            print_obj_2(obj->value.pair.cdr);
-            printf(" )");
+        case OBJ_PAIR: {
+            printf("(");
+            print_obj_2(car(obj));
+            Obj *cur_cdr = cdr(obj);
+            bool done = false;
+            while (!done) {
+                if (cur_cdr->type == OBJ_PAIR) {
+                    printf(" ");
+                    print_obj_2(car(cur_cdr));
+                    cur_cdr = cdr(cur_cdr);
+                } else if (cur_cdr->type == OBJ_NIL) {
+                    printf(")");
+                    done = true;
+                }
+            }
             break;
+        }
         case OBJ_NIL:
-            printf("nil");
+            printf("()");
             break;
     }
 }
@@ -313,7 +343,7 @@ int main(int argc, char *argv[]) {
     // print_tokens(tok);
     Obj *ast = parse(&tok);
     // print_obj(ast);
-    Obj *result = eval(ast);
+    Obj *result = eval(ast, false);
     print_obj(result);
     return 0;
 }
