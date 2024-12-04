@@ -1,13 +1,17 @@
 #!/bin/sh
 
-assert () {
+assert() {
     OUTPUT=`./pr7rs "$1"`
-    if [ "$OUTPUT" = "$2" ]; then
+    EXIT_CODE=$?
+    if [ "$OUTPUT" = "$2" ] && [ $EXIT_CODE -eq 0 ]; then
         echo $1 '==>' $OUTPUT
+        return
+    elif [ $EXIT_CODE -ne 0 ]; then
+        echo "\e[31mERROR: Program terminated unexpectedly."
     else
         echo "\e[31mERROR: $2 expected, but got $OUTPUT"
-        exit
     fi
+    exit
 }
 
 assert '(+ 1 2)' 3
@@ -32,5 +36,6 @@ assert '12345' '12345'
 assert "'12345" '12345'
 assert "'#t" '#t'
 assert '#t' '#t'
+assert '(define x 10)' 'Undefined'
 
 echo "\e[32mALL TESTS PASSED"

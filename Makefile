@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-Wall -g
+CFLAGS=-std=c11 -Wall -g
 
 pr7rs: c_pr7rs.c
 	$(CC) -o $@ $(CFLAGS) $^

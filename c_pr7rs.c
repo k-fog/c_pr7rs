@@ -5,23 +5,28 @@
 #include <string.h>
 
 #define TOKEN_MAX_LEN 32
+#define ENV_SIZE 23
 
 const char *ident_chars = "!$%%&*+-./:<=>?^_~";
 
-typedef enum ObjType { OBJ_NUM, OBJ_BOOL, OBJ_SYM, OBJ_PAIR, OBJ_NIL } ObjType;
-typedef struct Obj {
+typedef struct Obj Obj;
+typedef struct Env Env;
+
+typedef enum ObjType { OBJ_NUM, OBJ_BOOL, OBJ_SYM, OBJ_PAIR, OBJ_PRIM, OBJ_NIL } ObjType;
+struct Obj {
     ObjType type;
+    size_t len;
     union {
         int number;
         bool boolean;
         char *symbol;
         struct Pair {
-            struct Obj *car;
-            struct Obj *cdr;
+            Obj *car;
+            Obj *cdr;
         } pair;
-    } value;
-    size_t len;
-} Obj;
+        Obj *(*prim_fn)(Obj *args, Env *env);
+    };
+};
 
 Obj *obj(ObjType type) {
     Obj *obj = calloc(1, sizeof(Obj));
@@ -31,14 +36,20 @@ Obj *obj(ObjType type) {
 
 Obj *number(int n) {
     Obj *o = obj(OBJ_NUM);
-    o->value.number = n;
+    o->number = n;
     return o;
 }
 
 Obj *symbol(char *sym) {
     Obj *o = obj(OBJ_SYM);
-    o->value.symbol = sym;
+    o->symbol = sym;
     o->len = strlen(sym);
+    return o;
+}
+
+Obj *prim_fn(Obj *(*fn)(Obj *args, struct Env *env)) {
+    Obj *o = obj(OBJ_PRIM);
+    o->prim_fn = fn;
     return o;
 }
 
@@ -65,6 +76,69 @@ Token *token(TokenType type, char *str, size_t len) {
     t->len = len;
     t->next = NULL;
     return t;
+}
+
+typedef struct Entry {
+    Obj *key;
+    Obj *value;
+    struct Entry *next;
+} Entry;
+
+typedef struct Env {
+    Entry **vars;
+    struct Env *outer;
+} Env;
+
+Entry *entry(Obj *key, Obj *value) {
+    Entry *e = calloc(1, sizeof(Entry));
+    e->key = key;
+    e->value = value;
+    return e;
+}
+
+Env *env(Env *outer) {
+    Env *e = calloc(1, sizeof(Env));
+    e->vars = calloc(ENV_SIZE, sizeof(Entry));
+    for (size_t i = 0; i < ENV_SIZE; i++) {
+        e->vars[i] = NULL;
+    }
+    e->outer = outer;
+    return e;
+}
+
+int hash(const char *key, size_t key_len) {
+    int hash = 0;
+    for (int i = 0; i < key_len; i++) {
+        hash = 13 * hash + key[i];
+    }
+    return hash % ENV_SIZE;
+}
+
+void push_env(Env *env, Obj *key, Obj *value) {
+    int idx = hash(key->symbol, key->len);
+    Entry *e = env->vars[idx];
+    while (e != NULL) {
+        if (strncmp(e->key->symbol, key->symbol, key->len) == 0) {
+            printf("error\n");
+        }
+        e = e->next;
+    }
+    e = entry(key, value);
+    e->next = env->vars[idx];
+    env->vars[idx] = e;
+    return;
+}
+
+Obj *find(Env *env, Obj *key) {
+    int idx = hash(key->symbol, key->len);
+    Entry *e = env->vars[idx];
+    while (e != NULL) {
+        if (strncmp(e->key->symbol, key->symbol, key->len) == 0) {
+            return e->value;
+        }
+        e = e->next;
+    }
+    return env->outer == NULL ? NULL : find(env->outer, key);
 }
 
 char *read_file(char *path) {
@@ -158,10 +232,10 @@ Obj *parse(Token **tok) {
             Obj *head = cur_obj;
             *tok = (*tok)->next;
             while ((*tok)->type != TOK_RPAREN) {
-                cur_obj->value.pair.car = parse(tok);
-                cur_obj->value.pair.cdr = obj(OBJ_PAIR);
+                cur_obj->pair.car = parse(tok);
+                cur_obj->pair.cdr = obj(OBJ_PAIR);
                 *tok = (*tok)->next;
-                cur_obj = cur_obj->value.pair.cdr;
+                cur_obj = cur_obj->pair.cdr;
             }
             cur_obj->type = OBJ_NIL;
             return head;
@@ -170,114 +244,109 @@ Obj *parse(Token **tok) {
             return NULL;
         case TOK_NUM: {
             Obj *o = obj(OBJ_NUM);
-            o->value.number = strtol((*tok)->str, NULL, 10);
+            o->number = strtol((*tok)->str, NULL, 10);
             return o;
         }
         case TOK_IDENT: {
             Obj *o = obj(OBJ_SYM);
-            o->value.symbol = (*tok)->str;
+            o->symbol = (*tok)->str;
             o->len = (*tok)->len;
             return o;
         }
         case TOK_TRUE: {
             Obj *o = obj(OBJ_BOOL);
-            o->value.boolean = true;
+            o->boolean = true;
             return o;
         }
         case TOK_FALSE: {
             Obj *o = obj(OBJ_BOOL);
-            o->value.boolean = false;
+            o->boolean = false;
             return o;
         }
         case TOK_QUOTE: {
             Obj *o = obj(OBJ_PAIR);
-            o->value.pair.car = symbol("quote");
-            o->value.pair.cdr = obj(OBJ_PAIR);
-            o->value.pair.cdr->value.pair.car = parse(&(*tok)->next);
-            o->value.pair.cdr->value.pair.cdr = obj(OBJ_NIL);
+            o->pair.car = symbol("quote");
+            o->pair.cdr = obj(OBJ_PAIR);
+            o->pair.cdr->pair.car = parse(&(*tok)->next);
+            o->pair.cdr->pair.cdr = obj(OBJ_NIL);
             return o;
         }
     }
 }
 
-Obj *car(Obj *cons) { return cons->value.pair.car; }
+Obj *car(Obj *cons) { return cons->pair.car; }
 
-Obj *cdr(Obj *cons) { return cons->value.pair.cdr; }
+Obj *cdr(Obj *cons) { return cons->pair.cdr; }
 
-Obj *eval(Obj *obj);
-Obj *eval_2(Obj *obj, bool is_quoted);
+Obj *eval(Obj *obj, Env *env);
+Obj *eval_2(Obj *obj, Env *env, bool is_quoted);
 
-Obj *f_add(Obj *args) {
+Obj *f_add(Obj *args, Env *env) {
     int n = 0;
     while (args->type == OBJ_PAIR) {
-        n += eval(car(args))->value.number;
+        n += eval(car(args), env)->number;
         args = cdr(args);
     }
     return number(n);
 }
 
-Obj *f_sub(Obj *args) {
-    int n = eval(car(args))->value.number;
+Obj *f_sub(Obj *args, Env *env) {
+    int n = eval(car(args), env)->number;
     args = cdr(args);
     while (args->type == OBJ_PAIR) {
-        n -= eval(car(args))->value.number;
+        n -= eval(car(args), env)->number;
         args = cdr(args);
     }
     return number(n);
 }
 
-Obj *f_mult(Obj *args) {
-    int n = eval(car(args))->value.number;
+Obj *f_mult(Obj *args, Env *env) {
+    int n = eval(car(args), env)->number;
     args = cdr(args);
     while (args->type == OBJ_PAIR) {
-        n *= eval(car(args))->value.number;
+        n *= eval(car(args), env)->number;
         args = cdr(args);
     }
     return number(n);
 }
 
-Obj *f_if(Obj *args) {
-    return eval(car(args))->value.boolean ? eval(car(cdr(args)))
-                                          : eval(car(cdr(cdr(args))));
+Obj *f_if(Obj *args, Env *env) {
+    return eval(car(args), env)->boolean ? eval(car(cdr(args)), env)
+                                          : eval(car(cdr(cdr(args))), env);
 }
 
-Obj *f_quote(Obj *args) { return eval_2(car(args), true); }
+Obj *f_quote(Obj *args, Env *env) { return eval_2(car(args), env, true); }
 
-Obj *apply(Obj *fn, Obj *args) {
-    if (fn->type == OBJ_SYM) {
-        if (fn->len == 1) {
-            if (strncmp(fn->value.symbol, "+", 1) == 0)
-                return f_add(args);
-            else if (strncmp(fn->value.symbol, "-", 1) == 0)
-                return f_sub(args);
-            else if (strncmp(fn->value.symbol, "*", 1) == 0)
-                return f_mult(args);
-        } else if (fn->len == 2) {
-            if (strncmp(fn->value.symbol, "if", 2) == 0) return f_if(args);
-        } else if (fn->len == 5) {
-            if (strncmp(fn->value.symbol, "quote", 5) == 0)
-                return f_quote(args);
-        }
-    }
+Obj *f_define(Obj *args, Env *env) {
+    Obj *key = car(args);
+    Obj *value = eval(car(cdr(args)), env);
+    push_env(env, key, value);
+    return symbol("Undefined");
+}
+
+Obj *apply(Obj *fn, Obj *args, Env *env) {
+    if (fn->type == OBJ_PRIM)
+        return fn->prim_fn(args, env);
     printf("error\n");
     return NULL;
 }
 
-Obj *eval(Obj *obj) { return eval_2(obj, false); }
+Obj *eval(Obj *obj, Env *env) { return eval_2(obj, env, false); }
 
-Obj *eval_2(Obj *obj, bool is_quoted) {
-    // TODO: env
+Obj *eval_2(Obj *obj, Env *env, bool is_quoted) {
     if (is_quoted) return obj;
     switch (obj->type) {
         case OBJ_NUM:
         case OBJ_BOOL:
         case OBJ_NIL:
-        case OBJ_SYM:
+        case OBJ_PRIM:
             return obj;
+        case OBJ_SYM:
+            return find(env, obj);;
         case OBJ_PAIR: {
-            Obj *fn = eval(car(obj));
+            Obj *fn = eval(car(obj), env);
             Obj *args = cdr(obj);
-            return apply(fn, args);
+            return apply(fn, args, env);
         }
     }
 }
@@ -298,18 +367,21 @@ void print_tokens(Token *tok_head) {
 void print_obj_2(Obj *obj) {
     switch (obj->type) {
         case OBJ_NUM:
-            printf("%d", obj->value.number);
+            printf("%d", obj->number);
             break;
         case OBJ_BOOL:
-            printf("%s", obj->value.boolean ? "#t" : "#f");
+            printf("%s", obj->boolean ? "#t" : "#f");
             break;
         case OBJ_SYM: {
             char sym_str[TOKEN_MAX_LEN];
-            strncpy(sym_str, obj->value.symbol, obj->len);
+            strncpy(sym_str, obj->symbol, obj->len);
             sym_str[obj->len] = '\0';
             printf("%s", sym_str);
             break;
         }
+        case OBJ_PRIM:
+            printf("<function>");
+            break;
         case OBJ_PAIR: {
             printf("(");
             print_obj_2(car(obj));
@@ -338,6 +410,15 @@ void print_obj(Obj *obj) {
     printf("\n");
 }
 
+void add_prims(Env *env) {
+    push_env(env, symbol("+"), prim_fn(f_add));
+    push_env(env, symbol("-"), prim_fn(f_sub));
+    push_env(env, symbol("*"), prim_fn(f_mult));
+    push_env(env, symbol("if"), prim_fn(f_if));
+    push_env(env, symbol("quote"), prim_fn(f_quote));
+    push_env(env, symbol("define"), prim_fn(f_define));
+}
+
 int main(int argc, char *argv[]) {
     // char *lines = read_file("");
     char *input = argv[1];
@@ -345,7 +426,9 @@ int main(int argc, char *argv[]) {
     // print_tokens(tok);
     Obj *ast = parse(&tok);
     // print_obj(ast);
-    Obj *result = eval(ast);
+    Env *global_env = env(NULL);
+    add_prims(global_env);
+    Obj *result = eval(ast, global_env);
     print_obj(result);
     return 0;
 }
