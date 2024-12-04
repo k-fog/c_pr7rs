@@ -11,8 +11,18 @@ const char *ident_chars = "!$%%&*+-./:<=>?^_~";
 
 typedef struct Obj Obj;
 typedef struct Env Env;
+typedef struct Procedure Procedure;
 
-typedef enum ObjType { OBJ_NUM, OBJ_BOOL, OBJ_SYM, OBJ_PAIR, OBJ_PRIM, OBJ_NIL } ObjType;
+typedef enum ObjType {
+    OBJ_NUM,
+    OBJ_BOOL,
+    OBJ_SYM,
+    OBJ_PAIR,
+    OBJ_PRIM,
+    OBJ_PROC,
+    OBJ_NIL
+} ObjType;
+
 struct Obj {
     ObjType type;
     size_t len;
@@ -25,6 +35,7 @@ struct Obj {
             Obj *cdr;
         } pair;
         Obj *(*prim_fn)(Obj *args, Env *env);
+        Procedure *proc;
     };
 };
 
@@ -50,6 +61,22 @@ Obj *symbol(char *sym) {
 Obj *prim_fn(Obj *(*fn)(Obj *args, struct Env *env)) {
     Obj *o = obj(OBJ_PRIM);
     o->prim_fn = fn;
+    return o;
+}
+
+struct Procedure {
+    Obj *params;
+    Obj *body;
+    Env *outer_env;
+};
+
+Obj *procedure(Obj *params, Obj *body, Env *outer_env) {
+    Procedure *p = calloc(1, sizeof(Procedure));
+    p->params = params;
+    p->body = body;
+    p->outer_env = outer_env;
+    Obj *o = obj(OBJ_PROC);
+    o->proc = p;
     return o;
 }
 
@@ -96,7 +123,7 @@ Entry *entry(Obj *key, Obj *value) {
     return e;
 }
 
-Env *env(Env *outer) {
+Env *make_env(Env *outer) {
     Env *e = calloc(1, sizeof(Env));
     e->vars = calloc(ENV_SIZE, sizeof(Entry));
     for (size_t i = 0; i < ENV_SIZE; i++) {
@@ -324,9 +351,26 @@ Obj *f_define(Obj *args, Env *env) {
     return symbol("Undefined");
 }
 
+Obj *f_lambda(Obj *args, Env *env) {
+    Obj *params = car(args);
+    Obj *body = car(cdr(args));
+    return procedure(params, body, env);
+}
+
 Obj *apply(Obj *fn, Obj *args, Env *env) {
     if (fn->type == OBJ_PRIM)
         return fn->prim_fn(args, env);
+    else if (fn->type == OBJ_PROC) {
+        Env *new_env = make_env(fn->proc->outer_env);
+        Obj *cur_params = fn->proc->params;
+        Obj *cur_args = args;
+        while (cur_params->type == OBJ_PAIR) {
+            push_env(new_env, car(cur_params), car(cur_args));
+            cur_params = cdr(cur_params);
+            cur_args = cdr(cur_args);
+        }
+        return eval(fn->proc->body, new_env);
+    }
     printf("error\n");
     return NULL;
 }
@@ -340,6 +384,7 @@ Obj *eval_2(Obj *obj, Env *env, bool is_quoted) {
         case OBJ_BOOL:
         case OBJ_NIL:
         case OBJ_PRIM:
+        case OBJ_PROC:
             return obj;
         case OBJ_SYM:
             return find(env, obj);;
@@ -382,6 +427,9 @@ void print_obj_2(Obj *obj) {
         case OBJ_PRIM:
             printf("<function>");
             break;
+        case OBJ_PROC:
+            printf("<procedure>");
+            break;
         case OBJ_PAIR: {
             printf("(");
             print_obj_2(car(obj));
@@ -417,6 +465,7 @@ void add_prims(Env *env) {
     push_env(env, symbol("if"), prim_fn(f_if));
     push_env(env, symbol("quote"), prim_fn(f_quote));
     push_env(env, symbol("define"), prim_fn(f_define));
+    push_env(env, symbol("lambda"), prim_fn(f_lambda));
 }
 
 int main(int argc, char *argv[]) {
@@ -426,7 +475,7 @@ int main(int argc, char *argv[]) {
     // print_tokens(tok);
     Obj *ast = parse(&tok);
     // print_obj(ast);
-    Env *global_env = env(NULL);
+    Env *global_env = make_env(NULL);
     add_prims(global_env);
     Obj *result = eval(ast, global_env);
     print_obj(result);

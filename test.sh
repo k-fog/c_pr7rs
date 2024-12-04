@@ -37,5 +37,7 @@ assert "'12345" '12345'
 assert "'#t" '#t'
 assert '#t' '#t'
 assert '(define x 10)' 'Undefined'
+assert '((lambda (x) (- x 10)) 10 )' 0
+assert '((lambda (x y) (* x y)) 10 20)' 200
 
 echo "\e[32mALL TESTS PASSED"
