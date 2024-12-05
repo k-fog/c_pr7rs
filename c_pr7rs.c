@@ -307,6 +307,10 @@ Obj *parse(Token **tok) {
     }
 }
 
+bool is_truthy(Obj *obj) {
+    return obj->type != OBJ_BOOL || obj->boolean == true;
+}
+
 Obj *car(Obj *cons) { return cons->pair.car; }
 
 Obj *cdr(Obj *cons) { return cons->pair.cdr; }
@@ -344,10 +348,8 @@ Obj *f_mult(Obj *args, Env *env) {
 }
 
 Obj *f_if(Obj *args, Env *env) {
-    // TODO fix
     Obj *ret = eval(car(args), env);
-    return eval(car(args), env)->boolean ? eval(car(cdr(args)), env)
-                                         : eval(car(cdr(cdr(args))), env);
+    return is_truthy(ret) ? eval(car(cdr(args)), env) : eval(car(cdr(cdr(args))), env);
 }
 
 Obj *f_quote(Obj *args, Env *env) { return eval_2(car(args), env, true); }
@@ -397,6 +399,10 @@ Obj *f_car(Obj *args, Env *env) {
 
 Obj *f_cdr(Obj *args, Env *env) {
     return eval(car(args), env)->pair.cdr;
+}
+
+Obj *f_not(Obj *args, Env *env) {
+    return is_truthy(eval(car(args), env)) ? boolean(false) : boolean(true);
 }
 
 Obj *apply(Obj *fn, Obj *args, Env *env) {
@@ -517,6 +523,7 @@ void add_prims(Env *env) {
     push_env(env, symbol("symbol?"), prim_fn(f_symbolp));
     push_env(env, symbol("car"), prim_fn(f_car));
     push_env(env, symbol("cdr"), prim_fn(f_cdr));
+    push_env(env, symbol("not"), prim_fn(f_not));
 }
 
 int main(int argc, char *argv[]) {

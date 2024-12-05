@@ -1,6 +1,6 @@
 #!/bin/sh
 
-$ALL_TESTS_PASSED=true
+ALL_TESTS_PASSED=true
 
 assert() {
     OUTPUT=`./pr7rs "$1"`
@@ -77,6 +77,14 @@ assert "(symbol? (car '(a b)))" '#t'
 assert "(symbol? 'nil)" '#t'
 assert "(symbol? '())" '#f'
 assert "(symbol? #f)" '#f'
+
+assert "(not #t)" '#f'
+assert "(not 3)" '#f'
+assert "(not '(3))" '#f'
+assert "(not #f)" '#t'
+assert "(not '())" '#f'
+assert "(not 'nil)" '#f'
+
 
 if $ALL_TESTS_PASSED; then
     echo "\e[32mALL TESTS PASSED"
