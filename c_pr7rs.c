@@ -93,7 +93,8 @@ typedef enum {
     TOK_IDENT,
     TOK_TRUE,
     TOK_FALSE,
-    TOK_QUOTE
+    TOK_QUOTE,
+    TOK_EOF,
 } TokenType;
 typedef struct Token {
     TokenType type;
@@ -254,6 +255,7 @@ Token *tokenize(char *c) {
 
         tok = tok->next;
     }
+    tok->next = token(TOK_EOF, c, 0);
     return head->next;
 }
 
@@ -264,36 +266,42 @@ Obj *parse(Token **tok) {
             Obj *cur_obj = obj(OBJ_PAIR);
             Obj *head = cur_obj;
             *tok = (*tok)->next;
+
             while ((*tok)->type != TOK_RPAREN) {
                 cur_obj->pair.car = parse(tok);
                 cur_obj->pair.cdr = obj(OBJ_PAIR);
-                *tok = (*tok)->next;
                 cur_obj = cur_obj->pair.cdr;
             }
             cur_obj->type = OBJ_NIL;
+            *tok = (*tok)->next;
             return head;
         }
         case TOK_RPAREN:
+            printf("error: Unmatched ')'\n");
             return NULL;
         case TOK_NUM: {
             Obj *o = obj(OBJ_NUM);
             o->number = strtol((*tok)->str, NULL, 10);
+            *tok = (*tok)->next;
             return o;
         }
         case TOK_IDENT: {
             Obj *o = obj(OBJ_SYM);
             o->symbol = (*tok)->str;
             o->len = (*tok)->len;
+            *tok = (*tok)->next;
             return o;
         }
         case TOK_TRUE: {
             Obj *o = obj(OBJ_BOOL);
             o->boolean = true;
+            *tok = (*tok)->next;
             return o;
         }
         case TOK_FALSE: {
             Obj *o = obj(OBJ_BOOL);
             o->boolean = false;
+            *tok = (*tok)->next;
             return o;
         }
         case TOK_QUOTE: {
@@ -302,7 +310,11 @@ Obj *parse(Token **tok) {
             o->pair.cdr = obj(OBJ_PAIR);
             o->pair.cdr->pair.car = parse(&(*tok)->next);
             o->pair.cdr->pair.cdr = obj(OBJ_NIL);
+            *tok = (*tok)->next;
             return o;
+        case TOK_EOF:
+            printf("error: Unexpected EOF\n");
+            return NULL;
         }
     }
 }
@@ -449,6 +461,10 @@ void print_tokens(Token *tok_head) {
     printf("[DEBUG] tokens:\n");
     Token *tok = tok_head;
     while (tok != NULL) {
+        if (tok->type == TOK_EOF) {
+            printf("EOF\n");
+            break;
+        }
         char tok_str[TOKEN_MAX_LEN];
         strncpy(tok_str, tok->str, tok->len);
         tok_str[tok->len] = '\0';
@@ -530,11 +546,9 @@ int main(int argc, char *argv[]) {
     // char *lines = read_file("");
     char *input = argv[1];
     Token *tok = tokenize(input);
-    // print_tokens(tok);
-    Obj *ast = parse(&tok);
-    // print_obj(ast);
     Env *global_env = make_env(NULL);
     add_prims(global_env);
+    Obj *ast = parse(&tok);
     Obj *result = eval(ast, global_env);
     print_obj(result);
     return 0;
