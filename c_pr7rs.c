@@ -64,6 +64,12 @@ Obj *prim_fn(Obj *(*fn)(Obj *args, struct Env *env)) {
     return o;
 }
 
+Obj *boolean(bool b) {
+    Obj *o = obj(OBJ_BOOL);
+    o->boolean = b;
+    return o;
+}
+
 struct Procedure {
     Obj *params;
     Obj *body;
@@ -338,8 +344,10 @@ Obj *f_mult(Obj *args, Env *env) {
 }
 
 Obj *f_if(Obj *args, Env *env) {
+    // TODO fix
+    Obj *ret = eval(car(args), env);
     return eval(car(args), env)->boolean ? eval(car(cdr(args)), env)
-                                          : eval(car(cdr(cdr(args))), env);
+                                         : eval(car(cdr(cdr(args))), env);
 }
 
 Obj *f_quote(Obj *args, Env *env) { return eval_2(car(args), env, true); }
@@ -355,6 +363,40 @@ Obj *f_lambda(Obj *args, Env *env) {
     Obj *params = car(args);
     Obj *body = car(cdr(args));
     return procedure(params, body, env);
+}
+
+Obj *f_boolp(Obj *args, Env *env) {
+    return eval(car(args), env)->type == OBJ_BOOL ? boolean(true) : boolean(false);
+}
+
+Obj *f_numberp(Obj *args, Env *env) {
+    return eval(car(args), env)->type == OBJ_NUM ? boolean(true) : boolean(false);
+}
+
+Obj *f_procp(Obj *args, Env *env) {
+    Obj *ret = eval(car(args), env);
+    return ret->type == OBJ_PROC || ret->type == OBJ_PRIM ? boolean(true)
+                                                          : boolean(false);
+}
+
+Obj *f_nullp(Obj *args, Env *env) {
+    return eval(car(args), env)->type == OBJ_NIL ? boolean(true) : boolean(false);
+}
+
+Obj *f_pairp(Obj *args, Env *env) {
+    return eval(car(args), env)->type == OBJ_PAIR ? boolean(true) : boolean(false);
+}
+
+Obj *f_symbolp(Obj *args, Env *env) {
+    return eval(car(args), env)->type == OBJ_SYM ? boolean(true) : boolean(false);
+}
+
+Obj *f_car(Obj *args, Env *env) {
+    return eval(car(args), env)->pair.car;
+}
+
+Obj *f_cdr(Obj *args, Env *env) {
+    return eval(car(args), env)->pair.cdr;
 }
 
 Obj *apply(Obj *fn, Obj *args, Env *env) {
@@ -387,7 +429,8 @@ Obj *eval_2(Obj *obj, Env *env, bool is_quoted) {
         case OBJ_PROC:
             return obj;
         case OBJ_SYM:
-            return find(env, obj);;
+            return find(env, obj);
+            ;
         case OBJ_PAIR: {
             Obj *fn = eval(car(obj), env);
             Obj *args = cdr(obj);
@@ -466,6 +509,14 @@ void add_prims(Env *env) {
     push_env(env, symbol("quote"), prim_fn(f_quote));
     push_env(env, symbol("define"), prim_fn(f_define));
     push_env(env, symbol("lambda"), prim_fn(f_lambda));
+    push_env(env, symbol("boolean?"), prim_fn(f_boolp));
+    push_env(env, symbol("number?"), prim_fn(f_numberp));
+    push_env(env, symbol("procedure?"), prim_fn(f_procp));
+    push_env(env, symbol("null?"), prim_fn(f_nullp));
+    push_env(env, symbol("pair?"), prim_fn(f_pairp));
+    push_env(env, symbol("symbol?"), prim_fn(f_symbolp));
+    push_env(env, symbol("car"), prim_fn(f_car));
+    push_env(env, symbol("cdr"), prim_fn(f_cdr));
 }
 
 int main(int argc, char *argv[]) {
