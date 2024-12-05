@@ -5,7 +5,7 @@
 #include <string.h>
 
 #define TOKEN_MAX_LEN 32
-#define ENV_SIZE 23
+#define ENV_SIZE (64 + 3)
 
 const char *ident_chars = "!$%%&*+-./:<=>?^_~";
 
@@ -142,7 +142,7 @@ Env *make_env(Env *outer) {
 int hash(const char *key, size_t key_len) {
     int hash = 0;
     for (int i = 0; i < key_len; i++) {
-        hash = 13 * hash + key[i];
+        hash ^= (key[i] << (i % 4) * 8); 
     }
     return hash % ENV_SIZE;
 }
@@ -151,7 +151,7 @@ void push_env(Env *env, Obj *key, Obj *value) {
     int idx = hash(key->symbol, key->len);
     Entry *e = env->vars[idx];
     while (e != NULL) {
-        if (strncmp(e->key->symbol, key->symbol, key->len) == 0) {
+        if (e->key->len == key->len && strncmp(e->key->symbol, key->symbol, key->len) == 0) {
             printf("error\n");
         }
         e = e->next;
