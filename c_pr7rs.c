@@ -328,7 +328,6 @@ Obj *car(Obj *cons) { return cons->pair.car; }
 Obj *cdr(Obj *cons) { return cons->pair.cdr; }
 
 Obj *eval(Obj *obj, Env *env);
-Obj *eval_2(Obj *obj, Env *env, bool is_quoted);
 
 Obj *f_add(Obj *args, Env *env) {
     int n = 0;
@@ -364,7 +363,7 @@ Obj *f_if(Obj *args, Env *env) {
     return is_truthy(ret) ? eval(car(cdr(args)), env) : eval(car(cdr(cdr(args))), env);
 }
 
-Obj *f_quote(Obj *args, Env *env) { return eval_2(car(args), env, true); }
+Obj *f_quote(Obj *args, Env *env) { return car(args); }
 
 Obj *f_define(Obj *args, Env *env) {
     Obj *key = car(args);
@@ -435,10 +434,7 @@ Obj *apply(Obj *fn, Obj *args, Env *env) {
     return NULL;
 }
 
-Obj *eval(Obj *obj, Env *env) { return eval_2(obj, env, false); }
-
-Obj *eval_2(Obj *obj, Env *env, bool is_quoted) {
-    if (is_quoted) return obj;
+Obj *eval(Obj *obj, Env *env) {
     switch (obj->type) {
         case OBJ_NUM:
         case OBJ_BOOL:
@@ -448,7 +444,6 @@ Obj *eval_2(Obj *obj, Env *env, bool is_quoted) {
             return obj;
         case OBJ_SYM:
             return find(env, obj);
-            ;
         case OBJ_PAIR: {
             Obj *fn = eval(car(obj), env);
             Obj *args = cdr(obj);
