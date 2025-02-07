@@ -416,6 +416,22 @@ Obj *f_not(Obj *args, Env *env) {
     return is_truthy(eval(car(args), env)) ? boolean(false) : boolean(true);
 }
 
+Obj *f_let(Obj *args, Env *env) {
+    Env *new_env = make_env(env);
+    Obj *bindings = car(args);
+    Obj *body = cdr(args);
+    while (bindings->type != OBJ_NIL) {
+        push_env(new_env, car(car(bindings)), eval(car(cdr(car(bindings))), env));
+        bindings = cdr(bindings);
+    }
+    Obj *ret = NULL;
+    while (body->type != OBJ_NIL) {
+        ret = eval(car(body), new_env);
+        body = cdr(body);
+    }
+    return ret;
+}
+
 Obj *apply(Obj *fn, Obj *args, Env *env) {
     if (fn->type == OBJ_PRIM)
         return fn->prim_fn(args, env);
@@ -424,7 +440,7 @@ Obj *apply(Obj *fn, Obj *args, Env *env) {
         Obj *cur_params = fn->proc->params;
         Obj *cur_args = args;
         while (cur_params->type == OBJ_PAIR) {
-            push_env(new_env, car(cur_params), car(cur_args));
+            push_env(new_env, car(cur_params), eval(car(cur_args), env));
             cur_params = cdr(cur_params);
             cur_args = cdr(cur_args);
         }
@@ -541,7 +557,7 @@ void add_prims(Env *env) {
     push_env(env, symbol("car"), prim_fn(f_car));
     push_env(env, symbol("cdr"), prim_fn(f_cdr));
     push_env(env, symbol("not"), prim_fn(f_not));
-    // push_env(env, symbol("let"), prim_fn(f_let));
+    push_env(env, symbol("let"), prim_fn(f_let));
 }
 
 int main(int argc, char *argv[]) {

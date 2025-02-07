@@ -86,13 +86,13 @@ assert "(not '())" '#f'
 assert "(not 'nil)" '#f'
 
 assert "((lambda (x) (define y 10) (+ x y)) 100)" 110
-# assert "(let ((x 2) (y 3)) (* x y))" 6
-# assert "(let ((x 2) (y 3)) (let ((x 7) (z (+ x y))) (* z x)))" 35
+assert "(let ((x 2) (y 3)) (* x y))" 6
+assert "(let ((x 2) (y 3)) (let ((x 7) (z (+ x y))) (* z x)))" 35
 
-# assert "(let ((x 5))
-# (define bar (lambda (a b) (+ (* a b) a)))
-# (define foo (lambda (y) (bar x y)))
-# (foo (+ x 3)))" 45
+assert "(let ((x 5))
+(define bar (lambda (a b) (+ (* a b) a)))
+(define foo (lambda (y) (bar x y)))
+(foo (+ x 3)))" 45
 
 if $ALL_TESTS_PASSED; then
     echo "\e[32mALL TESTS PASSED"
