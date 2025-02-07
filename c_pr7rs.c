@@ -374,7 +374,7 @@ Obj *f_define(Obj *args, Env *env) {
 
 Obj *f_lambda(Obj *args, Env *env) {
     Obj *params = car(args);
-    Obj *body = car(cdr(args));
+    Obj *body = cdr(args);
     return procedure(params, body, env);
 }
 
@@ -428,7 +428,13 @@ Obj *apply(Obj *fn, Obj *args, Env *env) {
             cur_params = cdr(cur_params);
             cur_args = cdr(cur_args);
         }
-        return eval(fn->proc->body, new_env);
+        Obj *ret = NULL;
+        Obj *body = fn->proc->body;
+        while (body->type != OBJ_NIL) {
+            ret = eval(car(body), new_env);
+            body = cdr(body);
+        }
+        return ret;
     }
     printf("error\n");
     return NULL;
@@ -535,6 +541,7 @@ void add_prims(Env *env) {
     push_env(env, symbol("car"), prim_fn(f_car));
     push_env(env, symbol("cdr"), prim_fn(f_cdr));
     push_env(env, symbol("not"), prim_fn(f_not));
+    // push_env(env, symbol("let"), prim_fn(f_let));
 }
 
 int main(int argc, char *argv[]) {

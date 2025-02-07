@@ -5,8 +5,8 @@ ALL_TESTS_PASSED=true
 assert() {
     OUTPUT=`./pr7rs "$1"`
     EXIT_CODE=$?
+    echo $1 '==>' $OUTPUT
     if [ "$OUTPUT" = "$2" ] && [ $EXIT_CODE -eq 0 ]; then
-        echo $1 '==>' $OUTPUT
         return
     elif [ $EXIT_CODE -ne 0 ]; then
         echo "\e[31mERROR: Program terminated unexpectedly.\e[0m"
@@ -85,6 +85,14 @@ assert "(not #f)" '#t'
 assert "(not '())" '#f'
 assert "(not 'nil)" '#f'
 
+assert "((lambda (x) (define y 10) (+ x y)) 100)" 110
+# assert "(let ((x 2) (y 3)) (* x y))" 6
+# assert "(let ((x 2) (y 3)) (let ((x 7) (z (+ x y))) (* z x)))" 35
+
+# assert "(let ((x 5))
+# (define bar (lambda (a b) (+ (* a b) a)))
+# (define foo (lambda (y) (bar x y)))
+# (foo (+ x 3)))" 45
 
 if $ALL_TESTS_PASSED; then
     echo "\e[32mALL TESTS PASSED"
